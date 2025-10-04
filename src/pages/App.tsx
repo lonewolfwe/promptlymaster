@@ -90,6 +90,40 @@ const AppPage = () => {
     }
   };
 
+  const handleGenerateAI = async () => {
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-ai-response', {
+        body: { xml_prompt: currentXML }
+      });
+
+      if (error) throw error;
+
+      setAiResponse(data.response);
+
+      const { error: updateError } = await supabase
+        .from('prompts')
+        .update({ ai_response: data.response })
+        .eq('plain_text', currentPlainText)
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "AI Response Generated!",
+        description: "The AI has responded to your structured prompt.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate AI response",
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSelectPrompt = (prompt: any) => {
     setCurrentXML(prompt.xml_output);
     setCurrentExplanation(prompt.explanation);
