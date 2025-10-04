@@ -29,14 +29,6 @@ const Index = () => {
               <Sparkles className="mr-2 h-5 w-5" />
               Get Started Free
             </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
-              onClick={() => navigate("/auth")}
-              className="text-lg px-8 py-6 border-white text-white hover:bg-white/10"
-            >
-              Sign In
-            </Button>
           </div>
         </div>
       </section>
@@ -44,7 +36,7 @@ const Index = () => {
       <section className="py-20 px-4 bg-background">
         <div className="container mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-            Why Use XML Prompt Builder?
+            Why Use Promptly?
           </h2>
           
           <div className="grid md:grid-cols-3 gap-8">
