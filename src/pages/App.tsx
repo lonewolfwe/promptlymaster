@@ -90,33 +90,6 @@ const AppPage = () => {
     }
   };
 
-  const handleGenerateAI = async () => {
-    setAiLoading(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-ai-response', {
-        body: { xmlPrompt: currentXML }
-      });
-
-      if (error) throw error;
-
-      setAiResponse(data.aiResponse);
-      
-      toast({
-        title: "AI Response Generated!",
-        description: "Check the response below.",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to generate AI response",
-      });
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
   const handleSelectPrompt = (prompt: any) => {
     setCurrentXML(prompt.xml_output);
     setCurrentExplanation(prompt.explanation);
