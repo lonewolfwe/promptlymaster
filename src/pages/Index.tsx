@@ -36,7 +36,7 @@ const Index = () => {
       <section className="py-20 px-4 bg-background">
         <div className="container mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
-            Why Use Promptly?
+            Why Use promptlymaster?
           </h2>
           
           <div className="grid md:grid-cols-3 gap-8">
