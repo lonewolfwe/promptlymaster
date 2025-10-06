@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Clock, FileText } from "lucide-react";
+import { History, Clock } from "lucide-react";
+import { format } from "date-fns";
 import { getIntentDisplayName } from "@/lib/xmlGenerator";
-import { useToast } from "@/hooks/use-toast";
 
 interface Prompt {
   id: string;
@@ -15,7 +14,7 @@ interface Prompt {
   plain_text: string;
   xml_output: string;
   explanation: string;
-  ai_response: string | null;
+  ai_response?: string | null;
 }
 
 interface PromptHistoryProps {
@@ -26,32 +25,18 @@ interface PromptHistoryProps {
 const PromptHistory = ({ onSelectPrompt, refreshTrigger }: PromptHistoryProps) => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchPrompts();
   }, [refreshTrigger]);
 
-  const fetchPrompts = async () => {
+  const fetchPrompts = () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('prompts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setPrompts(data || []);
+      const historyData = localStorage.getItem('promptHistory');
+      const history = historyData ? JSON.parse(historyData) : [];
+      setPrompts(history);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load prompt history",
-      });
+      console.error('Error fetching prompt history:', error);
     } finally {
       setLoading(false);
     }
@@ -59,51 +44,61 @@ const PromptHistory = ({ onSelectPrompt, refreshTrigger }: PromptHistoryProps) =
 
   if (loading) {
     return (
-      <Card>
+      <Card className="shadow-card">
         <CardHeader>
-          <CardTitle className="text-lg">Recent Prompts</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Recent Prompts
+          </CardTitle>
+          <CardDescription>Loading your history...</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="shadow-card hover:shadow-lifted transition-all duration-300">
       <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Clock className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2">
+          <History className="h-5 w-5 text-primary" />
           Recent Prompts
         </CardTitle>
+        <CardDescription>
+          Your last {prompts.length} prompts (stored locally)
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {prompts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No prompts yet. Create your first one!</p>
+          <div className="text-center py-8 text-muted-foreground">
+            <History className="h-12 w-12 mx-auto mb-2 opacity-20" />
+            <p className="text-sm">No prompts yet</p>
+            <p className="text-xs">Your history will appear here</p>
+          </div>
         ) : (
-          <ScrollArea className="h-[400px] pr-4">
+          <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-3">
               {prompts.map((prompt) => (
-                <button
+                <Button
                   key={prompt.id}
+                  variant="outline"
+                  className="w-full h-auto p-4 flex flex-col items-start hover:bg-accent/50 hover:border-primary/50 transition-all duration-200"
                   onClick={() => onSelectPrompt(prompt)}
-                  className="w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                      <span className="font-medium text-sm truncate">{prompt.title}</span>
+                  <div className="w-full">
+                    <p className="font-medium text-left line-clamp-2 mb-2">
+                      {prompt.title}
+                    </p>
+                    <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary">
+                        {getIntentDisplayName(prompt.intent_type as any)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {format(new Date(prompt.created_at), 'MMM d, h:mm a')}
+                      </span>
                     </div>
-                    <Badge variant="outline" className="flex-shrink-0">
-                      {getIntentDisplayName(prompt.intent_type as any)}
-                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(prompt.created_at).toLocaleDateString()} at{" "}
-                    {new Date(prompt.created_at).toLocaleTimeString()}
-                  </p>
-                </button>
+                </Button>
               ))}
             </div>
           </ScrollArea>

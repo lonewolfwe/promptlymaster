@@ -56,7 +56,7 @@ const Index = () => {
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
                   size="lg" 
-                  onClick={() => navigate("/auth")}
+                  onClick={() => navigate("/app")}
                   className="text-lg px-8 py-6 bg-white text-primary hover:bg-white/90 shadow-lifted group"
                 >
                   <Sparkles className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
@@ -362,7 +362,7 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <Button 
               size="lg"
-              onClick={() => navigate("/auth")}
+              onClick={() => navigate("/app")}
               className="text-lg px-12 py-6 bg-white text-primary hover:bg-white/90 shadow-lifted group"
             >
               <Sparkles className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />

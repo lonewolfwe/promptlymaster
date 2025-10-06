@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Sparkles } from "lucide-react";
+import { Home, Sparkles } from "lucide-react";
 import { getIntentDisplayName } from "@/lib/xmlGenerator";
 import PromptInput from "@/components/PromptInput";
 import XMLDisplay from "@/components/XMLDisplay";
@@ -12,7 +12,6 @@ import PromptHistory from "@/components/PromptHistory";
 import { detectIntent, generateXML, type IntentType } from "@/lib/xmlGenerator";
 
 const AppPage = () => {
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [currentXML, setCurrentXML] = useState<string>("");
@@ -23,28 +22,6 @@ const AppPage = () => {
   const [refreshHistory, setRefreshHistory] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-      setUser(session.user);
-    };
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
-        navigate("/auth");
-      } else {
-        setUser(session.user);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
 
   const handleGenerate = async (plainText: string) => {
     setLoading(true);
@@ -63,16 +40,21 @@ const AppPage = () => {
         ? plainText.substring(0, 47) + "..." 
         : plainText;
 
-      const { error } = await supabase.from('prompts').insert({
-        user_id: user.id,
+      // Store in localStorage
+      const historyItem = {
+        id: Date.now().toString(),
         title,
         plain_text: plainText,
         xml_output: template.xml,
         explanation: template.explanation,
         intent_type: intent,
-      });
+        created_at: new Date().toISOString(),
+        ai_response: null
+      };
 
-      if (error) throw error;
+      const existingHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]');
+      const updatedHistory = [historyItem, ...existingHistory].slice(0, 10);
+      localStorage.setItem('promptHistory', JSON.stringify(updatedHistory));
 
       toast({
         title: "XML Generated!",
@@ -102,13 +84,15 @@ const AppPage = () => {
 
       setAiResponse(data.response);
 
-      const { error: updateError } = await supabase
-        .from('prompts')
-        .update({ ai_response: data.response })
-        .eq('plain_text', currentPlainText)
-        .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
+      // Update localStorage with AI response
+      const existingHistory = JSON.parse(localStorage.getItem('promptHistory') || '[]');
+      const updatedHistory = existingHistory.map((item: any) => {
+        if (item.plain_text === currentPlainText && !item.ai_response) {
+          return { ...item, ai_response: data.response };
+        }
+        return item;
+      });
+      localStorage.setItem('promptHistory', JSON.stringify(updatedHistory));
 
       toast({
         title: "AI Response Generated!",
@@ -133,15 +117,6 @@ const AppPage = () => {
     setAiResponse(prompt.ai_response || "");
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
-  };
-
-  if (!user) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen gradient-subtle">
       <header className="border-b bg-card/80 backdrop-blur-lg supports-[backdrop-filter]:bg-card/80 sticky top-0 z-50">
@@ -154,13 +129,10 @@ const AppPage = () => {
               Promptly
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate("/")}>
+            <Home className="h-4 w-4 mr-2" />
+            Home
+          </Button>
         </div>
       </header>
 
