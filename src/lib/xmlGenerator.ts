@@ -7,40 +7,133 @@ export type IntentType =
   | "analysis"
   | "general";
 
+export interface IntentDetectionResult {
+  intent: IntentType;
+  confidence: number;
+  matchedKeywords: string[];
+  alternativeIntents: Array<{ intent: IntentType; confidence: number }>;
+}
+
 export interface XMLTemplate {
   intent: IntentType;
   xml: string;
   explanation: string;
 }
 
-export function detectIntent(plainText: string): IntentType {
+export function detectIntent(plainText: string): IntentDetectionResult {
   const lowerText = plainText.toLowerCase();
+  const scores: Record<IntentType, { score: number; keywords: string[] }> = {
+    summarization: { score: 0, keywords: [] },
+    question_answer: { score: 0, keywords: [] },
+    translation: { score: 0, keywords: [] },
+    creative_writing: { score: 0, keywords: [] },
+    code_generation: { score: 0, keywords: [] },
+    analysis: { score: 0, keywords: [] },
+    general: { score: 0, keywords: [] }
+  };
+
+  // Summarization patterns
+  const summarizationPatterns = [
+    { pattern: /\b(summarize|summary|tldr|brief)\b/i, weight: 3, keyword: "summarize" },
+    { pattern: /\b(key points|main ideas|gist)\b/i, weight: 2, keyword: "key points" },
+    { pattern: /\b(condense|shorten)\b/i, weight: 2, keyword: "condense" }
+  ];
+
+  // Translation patterns
+  const translationPatterns = [
+    { pattern: /\b(translate|translation)\b/i, weight: 3, keyword: "translate" },
+    { pattern: /from \w+ to \w+/i, weight: 3, keyword: "language pair" },
+    { pattern: /\b(spanish|french|german|chinese|japanese|italian)\b/i, weight: 1, keyword: "language" }
+  ];
+
+  // Creative writing patterns
+  const creativePatterns = [
+    { pattern: /\b(write|create|compose)\b/i, weight: 2, keyword: "write" },
+    { pattern: /\b(story|poem|essay|article|blog)\b/i, weight: 3, keyword: "creative content" },
+    { pattern: /\b(creative|imaginative|original)\b/i, weight: 2, keyword: "creative" }
+  ];
+
+  // Code generation patterns
+  const codePatterns = [
+    { pattern: /\b(code|function|program|script)\b/i, weight: 3, keyword: "code" },
+    { pattern: /\b(implement|develop|build)\b/i, weight: 1, keyword: "implement" },
+    { pattern: /\b(python|javascript|java|c\+\+|react|algorithm)\b/i, weight: 2, keyword: "programming language" }
+  ];
+
+  // Analysis patterns
+  const analysisPatterns = [
+    { pattern: /\b(analyze|analysis|evaluate)\b/i, weight: 3, keyword: "analyze" },
+    { pattern: /\b(compare|contrast|assess)\b/i, weight: 2, keyword: "compare" },
+    { pattern: /\b(pros and cons|advantages|disadvantages)\b/i, weight: 2, keyword: "pros/cons" }
+  ];
+
+  // Question patterns
+  const questionPatterns = [
+    { pattern: /\?/g, weight: 2, keyword: "question mark" },
+    { pattern: /\b(what|how|why|when|where|who|which)\b/i, weight: 1, keyword: "question word" },
+    { pattern: /\b(explain|tell me|can you)\b/i, weight: 1, keyword: "inquiry" }
+  ];
+
+  // Score each intent
+  [
+    { patterns: summarizationPatterns, intent: "summarization" as IntentType },
+    { patterns: translationPatterns, intent: "translation" as IntentType },
+    { patterns: creativePatterns, intent: "creative_writing" as IntentType },
+    { patterns: codePatterns, intent: "code_generation" as IntentType },
+    { patterns: analysisPatterns, intent: "analysis" as IntentType },
+    { patterns: questionPatterns, intent: "question_answer" as IntentType }
+  ].forEach(({ patterns, intent }) => {
+    patterns.forEach(({ pattern, weight, keyword }) => {
+      const matches = lowerText.match(pattern);
+      if (matches) {
+        scores[intent].score += weight * matches.length;
+        if (!scores[intent].keywords.includes(keyword)) {
+          scores[intent].keywords.push(keyword);
+        }
+      }
+    });
+  });
+
+  // Find top intent and alternatives
+  const sortedIntents = Object.entries(scores)
+    .map(([intent, data]) => ({
+      intent: intent as IntentType,
+      score: data.score,
+      keywords: data.keywords
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const topIntent = sortedIntents[0];
   
-  if (lowerText.includes("summarize") || lowerText.includes("summary") || lowerText.includes("tldr")) {
-    return "summarization";
+  // If no strong match, default to general
+  if (topIntent.score === 0) {
+    return {
+      intent: "general",
+      confidence: 0.5,
+      matchedKeywords: [],
+      alternativeIntents: []
+    };
   }
-  
-  if (lowerText.includes("translate") || lowerText.includes("translation") || lowerText.match(/from \w+ to \w+/)) {
-    return "translation";
-  }
-  
-  if (lowerText.includes("write") || lowerText.includes("story") || lowerText.includes("poem") || lowerText.includes("creative")) {
-    return "creative_writing";
-  }
-  
-  if (lowerText.includes("code") || lowerText.includes("function") || lowerText.includes("program") || lowerText.includes("script")) {
-    return "code_generation";
-  }
-  
-  if (lowerText.includes("analyze") || lowerText.includes("analysis") || lowerText.includes("compare") || lowerText.includes("evaluate")) {
-    return "analysis";
-  }
-  
-  if (lowerText.includes("?") || lowerText.includes("what") || lowerText.includes("how") || lowerText.includes("why") || lowerText.includes("when")) {
-    return "question_answer";
-  }
-  
-  return "general";
+
+  // Calculate confidence (0-1 scale)
+  const totalScore = sortedIntents.reduce((sum, item) => sum + item.score, 0);
+  const confidence = Math.min(topIntent.score / (totalScore || 1), 0.99);
+
+  // Get alternative intents with >10% of top score
+  const alternatives = sortedIntents
+    .slice(1, 4)
+    .filter(item => item.score > topIntent.score * 0.1)
+    .map(item => ({
+      intent: item.intent,
+      confidence: Math.min(item.score / (totalScore || 1), 0.99)
+    }));
+
+  return {
+    intent: topIntent.intent,
+    confidence,
+    matchedKeywords: topIntent.keywords,
+    alternativeIntents: alternatives
+  };
 }
 
 export function generateXML(plainText: string, intent: IntentType): XMLTemplate {
@@ -166,4 +259,30 @@ export function getIntentDisplayName(intent: IntentType): string {
     general: "General Task"
   };
   return names[intent];
+}
+
+export function getIntentIcon(intent: IntentType): string {
+  const icons: Record<IntentType, string> = {
+    summarization: "📝",
+    question_answer: "❓",
+    translation: "🌐",
+    creative_writing: "✨",
+    code_generation: "💻",
+    analysis: "📊",
+    general: "🎯"
+  };
+  return icons[intent];
+}
+
+export function getIntentColor(intent: IntentType): string {
+  const colors: Record<IntentType, string> = {
+    summarization: "from-blue-500 to-cyan-500",
+    question_answer: "from-purple-500 to-pink-500",
+    translation: "from-green-500 to-emerald-500",
+    creative_writing: "from-yellow-500 to-orange-500",
+    code_generation: "from-indigo-500 to-blue-500",
+    analysis: "from-red-500 to-rose-500",
+    general: "from-gray-500 to-slate-500"
+  };
+  return colors[intent];
 }
